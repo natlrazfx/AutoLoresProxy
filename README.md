@@ -290,25 +290,12 @@ Logs are written next to the lores file:
 _auto_lores_proxy.log
 ```
 
-## Screenshot
 
-Before publishing, place your screenshot here:
+## Don@tes
+**If any of this turns out to be useful for you - I’m glad.  
+And if you feel like supporting it:  
+☕ 1–2 coffees are more than enough ☺️**  
 
-```text
-screenshots/auto-lores-proxy-ui.png
-```
-
-The README already references that path.
-
-## License
-
-Add your preferred license before publishing.
-
-## Support
-
-If this tool saves you time, and you feel like supporting it:
-
-1-2 coffees are more than enough.
-
-[Click to Buy me a Coffee](https://buymeacoffee.com/natlrazfx)
+[Click to Buy me a Coffee](buymeacoffee.com/natlrazfx)
+[Subscribe me on Substack](https://substack.com/@natalia289425)
 
