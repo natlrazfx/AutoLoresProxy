@@ -3,6 +3,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 import nuke
@@ -31,6 +32,23 @@ def _find_ffmpeg(node=None):
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
         return ffmpeg
+
+    return None
+
+
+def _find_ffprobe(node=None):
+    ffmpeg = _find_ffmpeg(node)
+    if ffmpeg:
+        candidate = os.path.join(os.path.dirname(ffmpeg), "ffprobe.exe")
+        if os.path.isfile(candidate):
+            return candidate
+        candidate = os.path.join(os.path.dirname(ffmpeg), "ffprobe")
+        if os.path.isfile(candidate):
+            return candidate
+
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe:
+        return ffprobe
 
     return None
 
@@ -268,6 +286,58 @@ def _write_log(output_path, command, result):
     return log_path
 
 
+def _probe_movie(node, input_path):
+    ffprobe = _find_ffprobe(node)
+    if not ffprobe:
+        return True
+
+    command = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name,width,height",
+        "-of",
+        "default=nw=1",
+        input_path,
+    ]
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return result.returncode == 0 and "codec_name=" in result.stdout
+
+
+def _wait_for_readable_movie(node, input_path, timeout_seconds=300, interval_seconds=2):
+    deadline = time.time() + timeout_seconds
+    last_size = -1
+    stable_checks = 0
+    required_stable_checks = 5
+
+    while time.time() < deadline:
+        if not os.path.exists(input_path):
+            time.sleep(interval_seconds)
+            continue
+
+        size = os.path.getsize(input_path)
+        if size > 0 and size == last_size:
+            stable_checks += 1
+        else:
+            stable_checks = 0
+            last_size = size
+
+        if stable_checks >= required_stable_checks and _probe_movie(node, input_path):
+            return True
+
+        time.sleep(interval_seconds)
+
+    raise RuntimeError("Rendered movie is not readable yet: %s" % input_path)
+
+
 def _run_ffmpeg(node, input_path, output_path):
     command = _build_ffmpeg_command(node, input_path, output_path)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -428,6 +498,9 @@ def create_for_node(node, input_path=None, manual=False):
     if not os.path.exists(input_path):
         _set_status(node, "failed")
         raise ValueError("Rendered movie was not found: %s" % input_path)
+
+    _set_status(node, "waiting for movie")
+    _wait_for_readable_movie(node, input_path)
 
     suffix = str(_read_knob(node, "auto_lores_suffix", DEFAULT_SUFFIX)).strip() or DEFAULT_SUFFIX
     output_path, source_has_version = build_output_path(input_path, suffix=suffix)
